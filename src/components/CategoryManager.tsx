@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Category, CategoryTreeNode, getCategoryTree, createCategory, updateCategory, deleteCategory } from "@/lib/api";
 import { useApp } from "@/hooks/useApp";
 import { Button } from "@/components/ui/button";
@@ -69,9 +69,10 @@ function CategoryItem({ node, level, onEdit, onDelete, onAddChild }: CategoryIte
         <span className="text-2xl">{node.category.icon}</span>
         <div className="flex-1">
           <p className="font-medium">{node.category.name}</p>
-          {node.category.is_global && (
-            <span className="text-xs text-muted-foreground">Global</span>
-          )}
+          <div className="flex gap-2 text-xs text-muted-foreground">
+            {node.category.is_global && <span>Global</span>}
+            {node.category.parent_id && <span>Subcategory</span>}
+          </div>
         </div>
 
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -127,7 +128,6 @@ export default function CategoryManager() {
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [parentCategory, setParentCategory] = useState<Category | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -135,6 +135,7 @@ export default function CategoryManager() {
     name: "",
     icon: "📊",
     is_global: false,
+    parent_id: null as number | null,
   });
 
   const fetchTree = async () => {
@@ -156,20 +157,31 @@ export default function CategoryManager() {
     fetchTree();
   }, [selectedWallet]);
 
+  // Get flat list of root categories for parent selector (exclude current category when editing)
+  const rootCategories = useMemo(() => {
+    return tree
+      .map((node) => node.category)
+      .filter((cat) => !editingCategory || cat.category_id !== editingCategory.category_id);
+  }, [tree, editingCategory]);
+
   const openNewCategory = (parent?: Category) => {
     setEditingCategory(null);
-    setParentCategory(parent || null);
-    setFormData({ name: "", icon: "📊", is_global: false });
+    setFormData({
+      name: "",
+      icon: "📊",
+      is_global: false,
+      parent_id: parent?.category_id || null,
+    });
     setIsDialogOpen(true);
   };
 
   const openEditCategory = (category: Category) => {
     setEditingCategory(category);
-    setParentCategory(null);
     setFormData({
       name: category.name,
       icon: category.icon,
       is_global: category.is_global,
+      parent_id: category.parent_id,
     });
     setIsDialogOpen(true);
   };
@@ -185,13 +197,14 @@ export default function CategoryManager() {
           name: formData.name,
           icon: formData.icon,
           is_global: formData.is_global,
+          parent_id: formData.parent_id,
         });
         toast({ title: "Category updated" });
       } else {
         await createCategory(selectedWallet.wallet_id, {
           name: formData.name,
           icon: formData.icon,
-          parent_id: parentCategory?.category_id || null,
+          parent_id: formData.parent_id,
           is_global: formData.is_global,
         });
         toast({ title: "Category created" });
@@ -230,8 +243,12 @@ export default function CategoryManager() {
     }
   };
 
-  // Get flat list of root categories for parent selector
-  const rootCategories = tree.map((node) => node.category);
+  // Find current parent name for display
+  const currentParentName = useMemo(() => {
+    if (!formData.parent_id) return null;
+    const parent = rootCategories.find((c) => c.category_id === formData.parent_id);
+    return parent ? `${parent.icon} ${parent.name}` : null;
+  }, [formData.parent_id, rootCategories]);
 
   if (!selectedWallet) {
     return (
@@ -280,11 +297,7 @@ export default function CategoryManager() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingCategory
-                ? "Edit Category"
-                : parentCategory
-                ? `New Subcategory of ${parentCategory.name}`
-                : "New Category"}
+              {editingCategory ? "Edit Category" : "New Category"}
             </DialogTitle>
           </DialogHeader>
 
@@ -320,36 +333,38 @@ export default function CategoryManager() {
               />
             </div>
 
-            {!parentCategory && !editingCategory?.parent_id && (
-              <div className="space-y-2">
-                <Label>Parent Category (Optional)</Label>
-                <Select
-                  value={parentCategory?.category_id?.toString() || "none"}
-                  onValueChange={(value) => {
-                    if (value === "none") {
-                      setParentCategory(null);
-                    } else {
-                      const parent = rootCategories.find(
-                        (c) => c.category_id.toString() === value
-                      );
-                      setParentCategory(parent || null);
-                    }
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select parent" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No parent (root category)</SelectItem>
-                    {rootCategories.map((cat) => (
-                      <SelectItem key={cat.category_id} value={cat.category_id.toString()}>
-                        {cat.icon} {cat.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            {/* Parent Category Selector - always show */}
+            <div className="space-y-2">
+              <Label>Parent Category</Label>
+              <Select
+                value={formData.parent_id?.toString() || "none"}
+                onValueChange={(value) => {
+                  setFormData({
+                    ...formData,
+                    parent_id: value === "none" ? null : parseInt(value),
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select parent category">
+                    {formData.parent_id ? currentParentName : "No parent (root category)"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No parent (root category)</SelectItem>
+                  {rootCategories.map((cat) => (
+                    <SelectItem key={cat.category_id} value={cat.category_id.toString()}>
+                      {cat.icon} {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {editingCategory 
+                  ? "Change the parent to move this category" 
+                  : "Leave empty for a root category, or select a parent"}
+              </p>
+            </div>
 
             <div className="flex items-center justify-between">
               <div>

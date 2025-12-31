@@ -213,6 +213,7 @@ export async function updateCategory(
     name: string;
     icon: string;
     is_global: boolean;
+    parent_id: number | null;
   }>
 ): Promise<ApiResponse<Category>> {
   return apiRequest(`/wallets/${walletId}/categories/${categoryId}`, {
