@@ -1,0 +1,17 @@
+{
+  "name": "MoneyLover",
+  "short_name": "MoneyLover",
+  "description": "Smart expense tracking made simple",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#10b981",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon"
+    }
+  ]
+}
