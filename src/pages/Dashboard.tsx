@@ -8,32 +8,40 @@ import WalletManager from "@/components/WalletManager";
 import CategoryManager from "@/components/CategoryManager";
 import SettingsPanel from "@/components/SettingsPanel";
 import { useApp } from "@/hooks/useApp";
+
 type Tab = "transactions" | "categories" | "wallets" | "settings";
+
 export default function Dashboard() {
-  const {
-    selectedWallet,
-    refreshWallets
-  } = useApp();
+  const { selectedWallet, refreshWallets } = useApp();
   const [activeTab, setActiveTab] = useState<Tab>("transactions");
   const [showTransactionDialog, setShowTransactionDialog] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
   const handleTransactionClick = (transaction: Transaction) => {
     setEditingTransaction(transaction);
     setShowTransactionDialog(true);
   };
+
   const handleAddClick = () => {
     setEditingTransaction(null);
     setShowTransactionDialog(true);
   };
+
   const handleTransactionSuccess = useCallback(() => {
-    setRefreshTrigger(prev => prev + 1);
+    setRefreshTrigger((prev) => prev + 1);
     refreshWallets();
   }, [refreshWallets]);
+
   const renderContent = () => {
     switch (activeTab) {
       case "transactions":
-        return <TransactionList onTransactionClick={handleTransactionClick} refreshTrigger={refreshTrigger} />;
+        return (
+          <TransactionList
+            onTransactionClick={handleTransactionClick}
+            refreshTrigger={refreshTrigger}
+          />
+        );
       case "categories":
         return <CategoryManager />;
       case "wallets":
@@ -42,7 +50,9 @@ export default function Dashboard() {
         return <SettingsPanel />;
     }
   };
-  return <div className="min-h-screen bg-background flex flex-col">
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border safe-area-inset-top">
         <div className="flex items-center justify-between px-4 py-3">
@@ -53,7 +63,19 @@ export default function Dashboard() {
         </div>
 
         {/* Balance Display */}
-        {activeTab === "transactions" && selectedWallet}
+        {activeTab === "transactions" && selectedWallet && (
+          <div className="px-4 pb-3">
+            <div className="bg-gradient-to-r from-primary to-primary/80 rounded-2xl p-4 text-primary-foreground shadow-lg">
+              <p className="text-sm opacity-90">Total Balance</p>
+              <p className="text-3xl font-bold tracking-tight">
+                ${selectedWallet.balance.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main Content */}
@@ -62,12 +84,22 @@ export default function Dashboard() {
       </main>
 
       {/* Bottom Navigation */}
-      <BottomNav activeTab={activeTab} onTabChange={setActiveTab} onAddClick={handleAddClick} />
+      <BottomNav
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        onAddClick={handleAddClick}
+      />
 
       {/* Transaction Dialog */}
-      <TransactionDialog open={showTransactionDialog} onClose={() => {
-      setShowTransactionDialog(false);
-      setEditingTransaction(null);
-    }} transaction={editingTransaction} onSuccess={handleTransactionSuccess} />
-    </div>;
+      <TransactionDialog
+        open={showTransactionDialog}
+        onClose={() => {
+          setShowTransactionDialog(false);
+          setEditingTransaction(null);
+        }}
+        transaction={editingTransaction}
+        onSuccess={handleTransactionSuccess}
+      />
+    </div>
+  );
 }
