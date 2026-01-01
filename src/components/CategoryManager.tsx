@@ -50,10 +50,8 @@ function CategoryItem({ node, level, onEdit, onDelete, onAddChild }: CategoryIte
   return (
     <div>
       <div
-        className={cn(
-          "flex items-center gap-3 p-3 rounded-xl bg-card shadow-card mb-2 group",
-          level > 0 && "ml-6"
-        )}
+        className="flex items-center gap-3 p-3 rounded-xl bg-card shadow-card mb-2 group"
+        style={{ marginLeft: `${level * 24}px` }}
       >
         {hasChildren && (
           <button onClick={() => setExpanded(!expanded)} className="p-1">
