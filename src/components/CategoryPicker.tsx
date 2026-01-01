@@ -28,40 +28,47 @@ function CategoryNode({
   selectedId?: number;
   onSelect: (category: Category) => void;
 }) {
-  const [expanded, setExpanded] = useState(level === 0);
+  const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children && node.children.length > 0;
   const isSelected = node.category.category_id === selectedId;
 
   return (
     <div>
       <div
-        onClick={() => {
-          if (hasChildren && level === 0) {
-            setExpanded(!expanded);
-          } else {
-            onSelect(node.category);
-          }
-        }}
         className={cn(
           "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all",
           isSelected
             ? "bg-primary/10 border-2 border-primary"
-            : "hover:bg-muted active:bg-muted/80",
-          level > 0 && "ml-6"
+            : "hover:bg-muted active:bg-muted/80"
         )}
+        style={{ marginLeft: `${level * 24}px` }}
       >
-        <span className="text-2xl">{node.category.icon}</span>
-        <span className={cn("flex-1 font-medium", isSelected && "text-primary")}>
-          {node.category.name}
-        </span>
-        {hasChildren && level === 0 && (
-          <ChevronRight
-            className={cn(
-              "h-4 w-4 text-muted-foreground transition-transform",
-              expanded && "rotate-90"
-            )}
-          />
+        {hasChildren && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
+            className="p-1 -ml-1"
+          >
+            <ChevronRight
+              className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform",
+                expanded && "rotate-90"
+              )}
+            />
+          </button>
         )}
+        <div
+          className="flex items-center gap-3 flex-1"
+          onClick={() => onSelect(node.category)}
+        >
+          <span className="text-2xl">{node.category.icon}</span>
+          <span className={cn("flex-1 font-medium", isSelected && "text-primary")}>
+            {node.category.name}
+          </span>
+        </div>
       </div>
       
       {hasChildren && expanded && (
