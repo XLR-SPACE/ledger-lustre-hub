@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { getCategoryTree, CategoryTreeNode, Category } from "@/lib/api";
 import { useApp } from "@/hooks/useApp";
 import { cn } from "@/lib/utils";
-import { ChevronRight, Loader2 } from "lucide-react";
+import { ChevronRight, Loader2, Search } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
 interface CategoryPickerProps {
   open: boolean;
@@ -22,15 +23,32 @@ function CategoryNode({
   level,
   selectedId,
   onSelect,
+  searchQuery,
 }: {
   node: CategoryTreeNode;
   level: number;
   selectedId?: number;
   onSelect: (category: Category) => void;
+  searchQuery: string;
 }) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children && node.children.length > 0;
   const isSelected = node.category.category_id === selectedId;
+
+  // Check if this node or any children match the search
+  const matchesSearch = (n: CategoryTreeNode): boolean => {
+    const nameMatches = n.category.name.toLowerCase().includes(searchQuery.toLowerCase());
+    if (nameMatches) return true;
+    if (n.children) {
+      return n.children.some(matchesSearch);
+    }
+    return false;
+  };
+
+  // If searching and no match, hide this node
+  if (searchQuery && !matchesSearch(node)) {
+    return null;
+  }
 
   return (
     <div>
@@ -80,6 +98,7 @@ function CategoryNode({
               level={level + 1}
               selectedId={selectedId}
               onSelect={onSelect}
+              searchQuery={searchQuery}
             />
           ))}
         </div>
@@ -97,6 +116,7 @@ export default function CategoryPicker({
   const { selectedWallet } = useApp();
   const [tree, setTree] = useState<CategoryTreeNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     const fetchTree = async () => {
@@ -118,12 +138,30 @@ export default function CategoryPicker({
     fetchTree();
   }, [selectedWallet, open]);
 
+  // Reset search when dialog opens
+  useEffect(() => {
+    if (open) {
+      setSearchQuery("");
+    }
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-md max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Select Category</DialogTitle>
         </DialogHeader>
+        
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search categories..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
         
         <div className="flex-1 overflow-y-auto scrollbar-hide py-2">
           {isLoading ? (
@@ -146,6 +184,7 @@ export default function CategoryPicker({
                     onSelect(cat);
                     onClose();
                   }}
+                  searchQuery={searchQuery}
                 />
               ))}
             </div>

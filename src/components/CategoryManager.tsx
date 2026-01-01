@@ -30,7 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Loader2, ChevronRight, FolderTree } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, ChevronRight, FolderTree, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_ICONS = ["💵", "💸", "🛒", "🍽️", "🚗", "🏠", "💊", "🎬", "✈️", "📚", "💼", "🎁", "📊", "💎", "🏋️"];
@@ -41,11 +41,27 @@ interface CategoryItemProps {
   onEdit: (category: Category) => void;
   onDelete: (categoryId: number) => void;
   onAddChild: (parent: Category) => void;
+  searchQuery: string;
 }
 
-function CategoryItem({ node, level, onEdit, onDelete, onAddChild }: CategoryItemProps) {
+function CategoryItem({ node, level, onEdit, onDelete, onAddChild, searchQuery }: CategoryItemProps) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children && node.children.length > 0;
+
+  // Check if this node or any children match the search
+  const matchesSearch = (n: CategoryTreeNode): boolean => {
+    const nameMatches = n.category.name.toLowerCase().includes(searchQuery.toLowerCase());
+    if (nameMatches) return true;
+    if (n.children) {
+      return n.children.some(matchesSearch);
+    }
+    return false;
+  };
+
+  // If searching and no match, hide this node
+  if (searchQuery && !matchesSearch(node)) {
+    return null;
+  }
 
   return (
     <div>
@@ -109,6 +125,7 @@ function CategoryItem({ node, level, onEdit, onDelete, onAddChild }: CategoryIte
               onEdit={onEdit}
               onDelete={onDelete}
               onAddChild={onAddChild}
+              searchQuery={searchQuery}
             />
           ))}
         </div>
@@ -126,6 +143,7 @@ export default function CategoryManager() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [formData, setFormData] = useState({
     name: "",
@@ -277,6 +295,17 @@ export default function CategoryManager() {
         </Button>
       </div>
 
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search categories..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -296,6 +325,7 @@ export default function CategoryManager() {
               onEdit={openEditCategory}
               onDelete={setDeleteId}
               onAddChild={openNewCategory}
+              searchQuery={searchQuery}
             />
           ))}
         </div>

@@ -3,7 +3,8 @@ import { Transaction, getWalletTransactions } from "@/lib/api";
 import { useApp } from "@/hooks/useApp";
 import TransactionItem from "./TransactionItem";
 import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, endOfDay, endOfWeek, endOfMonth, endOfYear, addDays, addWeeks, addMonths, addYears } from "date-fns";
-import { ChevronLeft, ChevronRight, Calendar, ArrowUpDown, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, ArrowUpDown, Loader2, Search, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -28,6 +29,8 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
   const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
   const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
   const [periodDropdownOpen, setPeriodDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const { periodStart, periodEnd, periodLabel } = useMemo(() => {
     if (periodType === "custom" && customStartDate) {
@@ -124,13 +127,25 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
     fetchTransactions();
   }, [selectedWallet, periodStart, periodEnd, refreshTrigger]);
 
+  const filteredTransactions = useMemo(() => {
+    if (!searchQuery.trim()) return transactions;
+    
+    const query = searchQuery.toLowerCase();
+    return transactions.filter((t) => {
+      const matchesNotes = t.note?.toLowerCase().includes(query);
+      const matchesCategory = t.category?.name?.toLowerCase().includes(query);
+      const matchesDate = format(new Date(t.transaction_time), "MMM d, yyyy").toLowerCase().includes(query);
+      return matchesNotes || matchesCategory || matchesDate;
+    });
+  }, [transactions, searchQuery]);
+
   const sortedTransactions = useMemo(() => {
-    return [...transactions].sort((a, b) => {
+    return [...filteredTransactions].sort((a, b) => {
       const dateA = new Date(a[sortBy]).getTime();
       const dateB = new Date(b[sortBy]).getTime();
       return dateB - dateA;
     });
-  }, [transactions, sortBy]);
+  }, [filteredTransactions, sortBy]);
 
   const groupedTransactions = useMemo(() => {
     const groups: { [key: string]: Transaction[] } = {};
@@ -295,8 +310,41 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
           </Button>
         </div>
 
-        {/* Summary & Sort */}
-        <div className="flex items-center justify-between">
+        {/* Summary, Search & Sort */}
+        <div className="flex items-center justify-between gap-2">
+          {/* Search Toggle */}
+          <div className="flex items-center gap-2">
+            {isSearchOpen ? (
+              <div className="relative flex items-center animate-fade-in">
+                <Input
+                  placeholder="Search notes, category, date..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-8 w-40 text-xs pr-8"
+                  autoFocus
+                />
+                <button
+                  onClick={() => {
+                    setIsSearchOpen(false);
+                    setSearchQuery("");
+                  }}
+                  className="absolute right-2 p-0.5 hover:bg-muted rounded"
+                >
+                  <X className="h-3 w-3 text-muted-foreground" />
+                </button>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setIsSearchOpen(true)}
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+
           <div className="flex gap-4 text-sm">
             <span className="text-income font-medium">
               +${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}
