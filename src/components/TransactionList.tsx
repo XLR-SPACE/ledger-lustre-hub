@@ -2,12 +2,12 @@ import { useState, useEffect, useMemo } from "react";
 import { Transaction, getWalletTransactions } from "@/lib/api";
 import { useApp } from "@/hooks/useApp";
 import TransactionItem from "./TransactionItem";
-import DateRangePicker from "./DateRangePicker";
 import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, endOfDay, endOfWeek, endOfMonth, endOfYear, addDays, addWeeks, addMonths, addYears } from "date-fns";
-import { DateRange } from "react-day-picker";
-import { ChevronLeft, ChevronRight, Calendar, ArrowUpDown, Loader2, Filter } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar, ArrowUpDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 
 type PeriodType = "daily" | "weekly" | "monthly" | "yearly" | "custom";
@@ -25,14 +25,15 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
   const [periodType, setPeriodType] = useState<PeriodType>("monthly");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [sortBy, setSortBy] = useState<SortType>("transaction_time");
-  const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
+  const [periodDropdownOpen, setPeriodDropdownOpen] = useState(false);
 
   const { periodStart, periodEnd, periodLabel } = useMemo(() => {
-    // If custom date range is set, use it
-    if (periodType === "custom" && customDateRange?.from) {
-      const start = startOfDay(customDateRange.from);
-      const end = customDateRange.to ? endOfDay(customDateRange.to) : endOfDay(customDateRange.from);
-      const label = customDateRange.to
+    if (periodType === "custom" && customStartDate) {
+      const start = startOfDay(customStartDate);
+      const end = customEndDate ? endOfDay(customEndDate) : endOfDay(customStartDate);
+      const label = customEndDate
         ? `${format(start, "MMM d")} - ${format(end, "MMM d, yyyy")}`
         : format(start, "MMM d, yyyy");
       return { periodStart: start, periodEnd: end, periodLabel: label };
@@ -68,7 +69,7 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
     }
     
     return { periodStart: start, periodEnd: end, periodLabel: label };
-  }, [periodType, currentDate, customDateRange]);
+  }, [periodType, currentDate, customStartDate, customEndDate]);
 
   const navigate = (direction: "prev" | "next") => {
     if (periodType === "custom") return;
@@ -93,17 +94,10 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
   const handlePeriodTypeChange = (type: PeriodType) => {
     setPeriodType(type);
     if (type !== "custom") {
-      setCustomDateRange(undefined);
+      setCustomStartDate(undefined);
+      setCustomEndDate(undefined);
     }
-  };
-
-  const handleDateRangeChange = (range: DateRange | undefined) => {
-    setCustomDateRange(range);
-    if (range?.from) {
-      setPeriodType("custom");
-    } else {
-      setPeriodType("monthly");
-    }
+    setPeriodDropdownOpen(false);
   };
 
   useEffect(() => {
@@ -168,73 +162,138 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
     return { totalIncome: income, totalExpense: expense };
   }, [transactions]);
 
+  const periodOptions = [
+    { value: "daily", label: "Daily" },
+    { value: "weekly", label: "Weekly" },
+    { value: "monthly", label: "Monthly" },
+    { value: "yearly", label: "Yearly" },
+    { value: "custom", label: "Select Dates" },
+  ];
+
   return (
     <div className="flex flex-col h-full">
       {/* Period Navigation */}
       <div className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 pb-3 space-y-3">
-        {/* Period Type Selector */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {(["daily", "weekly", "monthly", "yearly"] as PeriodType[]).map((type) => (
-            <button
-              key={type}
-              onClick={() => handlePeriodTypeChange(type)}
-              className={cn(
-                "px-3 py-1.5 text-xs font-medium rounded-full transition-all",
-                periodType === type
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-muted/80"
-              )}
-            >
-              {type.charAt(0).toUpperCase() + type.slice(1)}
-            </button>
-          ))}
+        {/* Period Navigator with Dropdown */}
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("prev")}
+            className="h-8 w-8"
+            disabled={periodType === "custom"}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
           
-          {/* Date Range Picker */}
-          <DateRangePicker
-            dateRange={customDateRange}
-            onDateRangeChange={handleDateRangeChange}
-            className={cn(
-              "text-xs",
-              periodType === "custom" && "border-primary"
-            )}
-          />
-        </div>
-
-        {/* Period Navigator - only show for non-custom periods */}
-        {periodType !== "custom" && (
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("prev")}
-              className="h-8 w-8"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            
+          {periodType === "custom" ? (
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-sm">{periodLabel}</span>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    {customStartDate ? format(customStartDate, "MMM d, yyyy") : "Start Date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={customStartDate}
+                    onSelect={setCustomStartDate}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 text-xs px-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                  >
+                    <Select
+                      value={periodType}
+                      onValueChange={(v) => handlePeriodTypeChange(v as PeriodType)}
+                    >
+                      <SelectTrigger className="border-0 h-6 p-0 text-xs focus:ring-0">
+                        <span className="text-muted-foreground">TO</span>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {periodOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Button>
+                </PopoverTrigger>
+              </Popover>
+              
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-xs">
+                    <Calendar className="h-3 w-3 mr-1" />
+                    {customEndDate ? format(customEndDate, "MMM d, yyyy") : "End Date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <CalendarComponent
+                    mode="single"
+                    selected={customEndDate}
+                    onSelect={setCustomEndDate}
+                    initialFocus
+                    className="pointer-events-auto"
+                    disabled={(date) => customStartDate ? date < customStartDate : false}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("next")}
-              className="h-8 w-8"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
-
-        {/* Custom date label */}
-        {periodType === "custom" && customDateRange?.from && (
-          <div className="flex items-center justify-center gap-2 text-sm">
-            <Filter className="h-4 w-4 text-primary" />
-            <span className="font-medium">{periodLabel}</span>
-          </div>
-        )}
+          ) : (
+            <Popover open={periodDropdownOpen} onOpenChange={setPeriodDropdownOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" className="h-auto py-1 px-3 gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium text-sm">{periodLabel}</span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-40 p-1" align="center">
+                {periodOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => handlePeriodTypeChange(option.value as PeriodType)}
+                    className={cn(
+                      "w-full text-left px-3 py-2 text-sm rounded-md transition-colors",
+                      periodType === option.value
+                        ? "bg-primary text-primary-foreground"
+                        : "hover:bg-muted"
+                    )}
+                  >
+                    {option.label}
+                    {periodType === option.value && (
+                      <span className="float-right">✓</span>
+                    )}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+          )}
+          
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("next")}
+            className="h-8 w-8"
+            disabled={periodType === "custom"}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
 
         {/* Summary & Sort */}
         <div className="flex items-center justify-between">
