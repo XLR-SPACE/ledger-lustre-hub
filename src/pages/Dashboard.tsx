@@ -45,17 +45,9 @@ export default function Dashboard() {
   return <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border safe-area-inset-top">
-        <div className="flex items-center justify-between px-4 py-3">
-          <div>
-            <h1 className="text-xl font-bold text-foreground">MoneyLover</h1>
-          </div>
+        <div className="flex items-center justify-center px-4 py-3">
           <WalletSelector />
         </div>
-
-        {/* Balance Display */}
-        {activeTab === "transactions" && selectedWallet && <div className="px-4 pb-3">
-            
-          </div>}
       </header>
 
       {/* Main Content */}

@@ -76,16 +76,14 @@ function CategoryItem({ node, level, onEdit, onDelete, onAddChild }: CategoryIte
         </div>
 
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          {level === 0 && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onAddChild(node.category)}
-              title="Add subcategory"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onAddChild(node.category)}
+            title="Add subcategory"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -157,11 +155,24 @@ export default function CategoryManager() {
     fetchTree();
   }, [selectedWallet]);
 
-  // Get flat list of root categories for parent selector (exclude current category when editing)
-  const rootCategories = useMemo(() => {
-    return tree
-      .map((node) => node.category)
-      .filter((cat) => !editingCategory || cat.category_id !== editingCategory.category_id);
+  // Get flat list of ALL categories for parent selector (exclude current category when editing)
+  const allCategories = useMemo(() => {
+    const result: { category: Category; level: number }[] = [];
+    
+    const flattenTree = (nodes: CategoryTreeNode[], level: number) => {
+      nodes.forEach((node) => {
+        // Exclude the current category being edited (can't be its own parent)
+        if (!editingCategory || node.category.category_id !== editingCategory.category_id) {
+          result.push({ category: node.category, level });
+          if (node.children && node.children.length > 0) {
+            flattenTree(node.children, level + 1);
+          }
+        }
+      });
+    };
+    
+    flattenTree(tree, 0);
+    return result;
   }, [tree, editingCategory]);
 
   const openNewCategory = (parent?: Category) => {
@@ -246,9 +257,9 @@ export default function CategoryManager() {
   // Find current parent name for display
   const currentParentName = useMemo(() => {
     if (!formData.parent_id) return null;
-    const parent = rootCategories.find((c) => c.category_id === formData.parent_id);
-    return parent ? `${parent.icon} ${parent.name}` : null;
-  }, [formData.parent_id, rootCategories]);
+    const found = allCategories.find((c) => c.category.category_id === formData.parent_id);
+    return found ? `${found.category.icon} ${found.category.name}` : null;
+  }, [formData.parent_id, allCategories]);
 
   if (!selectedWallet) {
     return (
@@ -352,9 +363,11 @@ export default function CategoryManager() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No parent (root category)</SelectItem>
-                  {rootCategories.map((cat) => (
-                    <SelectItem key={cat.category_id} value={cat.category_id.toString()}>
-                      {cat.icon} {cat.name}
+                  {allCategories.map(({ category, level }) => (
+                    <SelectItem key={category.category_id} value={category.category_id.toString()}>
+                      <span style={{ paddingLeft: `${level * 16}px` }}>
+                        {category.icon} {category.name}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
