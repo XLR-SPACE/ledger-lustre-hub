@@ -22,10 +22,7 @@ export default function WalletSelector() {
       }}
     >
       <SelectTrigger className="w-auto min-w-[140px] h-9 bg-card border-border/50 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{selectedWallet?.icon || "💰"}</span>
-          <SelectValue placeholder="Select wallet" />
-        </div>
+        <SelectValue placeholder="Select wallet" />
       </SelectTrigger>
       <SelectContent>
         {wallets.map((wallet) => (
