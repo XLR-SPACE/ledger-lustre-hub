@@ -1,15 +1,73 @@
+import { useState } from "react";
 import { useApp } from "@/hooks/useApp";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { User, Smartphone, Info } from "lucide-react";
+import { User, Smartphone, Info, Wallet, FolderTree, ChevronRight } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
+import WalletManager from "./WalletManager";
+import CategoryManager from "./CategoryManager";
+
+type SettingsSection = "wallets" | "categories" | null;
 
 export default function SettingsPanel() {
   const { users, selectedUser, setSelectedUser, selectedWallet } = useApp();
+  const [openSection, setOpenSection] = useState<SettingsSection>(null);
+
+  const toggleSection = (section: SettingsSection) => {
+    setOpenSection(openSection === section ? null : section);
+  };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 pb-20 overflow-y-auto max-h-[calc(100vh-160px)]">
       <h2 className="text-lg font-semibold">Settings</h2>
+
+      {/* Wallets Section */}
+      <Collapsible open={openSection === "wallets"} onOpenChange={() => toggleSection("wallets")}>
+        <Card className="shadow-card">
+          <CollapsibleTrigger className="w-full">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  Wallets
+                </div>
+                <ChevronRight className={cn("h-4 w-4 transition-transform", openSection === "wallets" && "rotate-90")} />
+              </CardTitle>
+              <CardDescription className="text-left">Manage your wallets</CardDescription>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              <WalletManager />
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+
+      {/* Categories Section */}
+      <Collapsible open={openSection === "categories"} onOpenChange={() => toggleSection("categories")}>
+        <Card className="shadow-card">
+          <CollapsibleTrigger className="w-full">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2 justify-between">
+                <div className="flex items-center gap-2">
+                  <FolderTree className="h-4 w-4 text-primary" />
+                  Categories
+                </div>
+                <ChevronRight className={cn("h-4 w-4 transition-transform", openSection === "categories" && "rotate-90")} />
+              </CardTitle>
+              <CardDescription className="text-left">Manage expense and income categories</CardDescription>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0">
+              <CategoryManager />
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       {/* User Selection */}
       <Card className="shadow-card">

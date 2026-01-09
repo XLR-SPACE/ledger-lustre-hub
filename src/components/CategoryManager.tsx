@@ -42,9 +42,10 @@ interface CategoryItemProps {
   onDelete: (categoryId: number) => void;
   onAddChild: (parent: Category) => void;
   searchQuery: string;
+  forceExpanded?: boolean;
 }
 
-function CategoryItem({ node, level, onEdit, onDelete, onAddChild, searchQuery }: CategoryItemProps) {
+function CategoryItem({ node, level, onEdit, onDelete, onAddChild, searchQuery, forceExpanded }: CategoryItemProps) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children && node.children.length > 0;
 
@@ -58,64 +59,72 @@ function CategoryItem({ node, level, onEdit, onDelete, onAddChild, searchQuery }
     return false;
   };
 
+  // Check if THIS node directly matches
+  const thisNodeMatches = node.category.name.toLowerCase().includes(searchQuery.toLowerCase());
+
   // If searching and no match, hide this node
   if (searchQuery && !matchesSearch(node)) {
     return null;
   }
 
+  // If searching and this parent matches, show all children
+  const shouldShowAllChildren = searchQuery && thisNodeMatches && hasChildren;
+
   return (
     <div>
       <div
-        className="flex items-center gap-3 p-3 rounded-xl bg-card shadow-card mb-2 group"
-        style={{ marginLeft: `${level * 24}px` }}
+        className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 mb-1.5 group"
+        style={{ marginLeft: `${level * 20}px` }}
       >
         {hasChildren && (
-          <button onClick={() => setExpanded(!expanded)} className="p-1">
+          <button onClick={() => setExpanded(!expanded)} className="p-0.5">
             <ChevronRight
               className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform",
-                expanded && "rotate-90"
+                "h-3.5 w-3.5 text-muted-foreground transition-transform",
+                (expanded || forceExpanded || shouldShowAllChildren) && "rotate-90"
               )}
             />
           </button>
         )}
         
-        <span className="text-2xl">{node.category.icon}</span>
-        <div className="flex-1">
-          <p className="font-medium">{node.category.name}</p>
-          <div className="flex gap-2 text-xs text-muted-foreground">
+        <span className="text-lg">{node.category.icon}</span>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-sm truncate">{node.category.name}</p>
+          <div className="flex gap-1.5 text-[10px] text-muted-foreground">
             {node.category.is_global && <span>Global</span>}
-            {node.category.parent_id && <span>Subcategory</span>}
           </div>
         </div>
 
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button
             variant="ghost"
             size="icon"
+            className="h-7 w-7"
             onClick={() => onAddChild(node.category)}
             title="Add subcategory"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
+            className="h-7 w-7"
             onClick={() => onEdit(node.category)}
           >
-            <Pencil className="h-4 w-4" />
+            <Pencil className="h-3.5 w-3.5" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
+            className="h-7 w-7"
             onClick={() => onDelete(node.category.category_id)}
           >
-            <Trash2 className="h-4 w-4 text-destructive" />
+            <Trash2 className="h-3.5 w-3.5 text-destructive" />
           </Button>
         </div>
       </div>
 
-      {hasChildren && expanded && (
+      {hasChildren && (expanded || forceExpanded || shouldShowAllChildren) && (
         <div>
           {node.children!.map((child) => (
             <CategoryItem
@@ -126,6 +135,7 @@ function CategoryItem({ node, level, onEdit, onDelete, onAddChild, searchQuery }
               onDelete={onDelete}
               onAddChild={onAddChild}
               searchQuery={searchQuery}
+              forceExpanded={shouldShowAllChildren}
             />
           ))}
         </div>
@@ -171,13 +181,12 @@ export default function CategoryManager() {
     fetchTree();
   }, [selectedWallet]);
 
-  // Get flat list of ALL categories for parent selector (exclude current category when editing)
+  // Get flat list of ALL categories for parent selector
   const allCategories = useMemo(() => {
     const result: { category: Category; level: number }[] = [];
     
     const flattenTree = (nodes: CategoryTreeNode[], level: number) => {
       nodes.forEach((node) => {
-        // Exclude the current category being edited (can't be its own parent)
         if (!editingCategory || node.category.category_id !== editingCategory.category_id) {
           result.push({ category: node.category, level });
           if (node.children && node.children.length > 0) {
@@ -270,7 +279,6 @@ export default function CategoryManager() {
     }
   };
 
-  // Find current parent name for display
   const currentParentName = useMemo(() => {
     if (!formData.parent_id) return null;
     const found = allCategories.find((c) => c.category.category_id === formData.parent_id);
@@ -279,44 +287,43 @@ export default function CategoryManager() {
 
   if (!selectedWallet) {
     return (
-      <div className="text-center py-8 text-muted-foreground">
+      <div className="text-center py-6 text-muted-foreground text-sm">
         Select a wallet first
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Categories</h2>
+    <div className="space-y-3">
+      <div className="flex items-center justify-end">
         <Button size="sm" onClick={() => openNewCategory()}>
           <Plus className="h-4 w-4 mr-1" />
-          Add Category
+          Add
         </Button>
       </div>
 
       {/* Search Bar */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <Input
           placeholder="Search categories..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
+          className="pl-8 h-8 text-sm"
         />
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
         </div>
       ) : tree.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <FolderTree className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">No categories yet</p>
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <FolderTree className="h-10 w-10 text-muted-foreground mb-3" />
+          <p className="text-muted-foreground text-sm">No categories yet</p>
         </div>
       ) : (
-        <div className="space-y-1">
+        <div className="space-y-1 max-h-[40vh] overflow-y-auto scrollbar-hide">
           {tree.map((node) => (
             <CategoryItem
               key={node.category.category_id}
@@ -333,26 +340,26 @@ export default function CategoryManager() {
 
       {/* Category Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-base">
               {editingCategory ? "Edit Category" : "New Category"}
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Icon</Label>
-              <div className="flex flex-wrap gap-2">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Icon</Label>
+              <div className="flex flex-wrap gap-1.5">
                 {CATEGORY_ICONS.map((icon) => (
                   <button
                     key={icon}
                     type="button"
                     onClick={() => setFormData({ ...formData, icon })}
                     className={cn(
-                      "w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-all",
+                      "w-8 h-8 rounded-lg text-base flex items-center justify-center transition-all",
                       formData.icon === icon
-                        ? "bg-primary text-primary-foreground scale-110"
+                        ? "bg-primary text-primary-foreground scale-105"
                         : "bg-muted hover:bg-muted/80"
                     )}
                   >
@@ -362,19 +369,19 @@ export default function CategoryManager() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Name</Label>
+            <div className="space-y-1">
+              <Label className="text-xs">Name</Label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="Category name"
+                className="h-9"
                 required
               />
             </div>
 
-            {/* Parent Category Selector - always show */}
-            <div className="space-y-2">
-              <Label>Parent Category</Label>
+            <div className="space-y-1">
+              <Label className="text-xs">Parent Category</Label>
               <Select
                 value={formData.parent_id?.toString() || "none"}
                 onValueChange={(value) => {
@@ -384,36 +391,26 @@ export default function CategoryManager() {
                   });
                 }}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select parent category">
-                    {formData.parent_id ? currentParentName : "No parent (root category)"}
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Select parent">
+                    {formData.parent_id ? currentParentName : "No parent"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No parent (root category)</SelectItem>
+                  <SelectItem value="none">No parent (root)</SelectItem>
                   {allCategories.map(({ category, level }) => (
                     <SelectItem key={category.category_id} value={category.category_id.toString()}>
-                      <span style={{ paddingLeft: `${level * 16}px` }}>
+                      <span style={{ paddingLeft: `${level * 12}px` }}>
                         {category.icon} {category.name}
                       </span>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                {editingCategory 
-                  ? "Change the parent to move this category" 
-                  : "Leave empty for a root category, or select a parent"}
-              </p>
             </div>
 
             <div className="flex items-center justify-between">
-              <div>
-                <Label>Global Category</Label>
-                <p className="text-xs text-muted-foreground">
-                  Sync to all wallets
-                </p>
-              </div>
+              <Label className="text-xs">Global Category</Label>
               <Switch
                 checked={formData.is_global}
                 onCheckedChange={(checked) =>
@@ -423,13 +420,13 @@ export default function CategoryManager() {
             </div>
 
             <DialogFooter>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" size="sm" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : editingCategory ? (
-                  "Save Changes"
+                  "Save"
                 ) : (
-                  "Create Category"
+                  "Create"
                 )}
               </Button>
             </DialogFooter>
