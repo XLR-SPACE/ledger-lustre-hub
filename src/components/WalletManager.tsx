@@ -122,12 +122,11 @@ export default function WalletManager() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Wallets</h2>
+    <div className="space-y-3">
+      <div className="flex items-center justify-end">
         <Button size="sm" onClick={openNewWallet}>
           <Plus className="h-4 w-4 mr-1" />
-          Add Wallet
+          Add
         </Button>
       </div>
 
@@ -136,17 +135,17 @@ export default function WalletManager() {
           <div
             key={wallet.wallet_id}
             className={cn(
-              "flex items-center gap-3 p-4 bg-card rounded-xl shadow-card transition-all",
+              "flex items-center gap-2 p-3 bg-muted/50 rounded-lg transition-all",
               selectedWallet?.wallet_id === wallet.wallet_id &&
-                "ring-2 ring-primary"
+                "ring-1 ring-primary"
             )}
           >
-            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 text-2xl">
+            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 text-xl">
               {wallet.icon}
             </div>
-            <div className="flex-1">
-              <p className="font-medium">{wallet.name}</p>
-              <p className="text-lg font-bold text-primary">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">{wallet.name}</p>
+              <p className="text-sm font-semibold text-primary">
                 ${wallet.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </p>
             </div>
@@ -154,50 +153,52 @@ export default function WalletManager() {
               <Button
                 variant="ghost"
                 size="icon"
+                className="h-8 w-8"
                 onClick={() => openEditWallet(wallet)}
               >
-                <Pencil className="h-4 w-4" />
+                <Pencil className="h-3.5 w-3.5" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
+                className="h-8 w-8"
                 onClick={() => setDeleteWalletId(wallet.wallet_id)}
               >
-                <Trash2 className="h-4 w-4 text-destructive" />
+                <Trash2 className="h-3.5 w-3.5 text-destructive" />
               </Button>
             </div>
           </div>
         ))}
 
         {wallets.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            No wallets yet. Create your first wallet!
+          <div className="text-center py-6 text-muted-foreground text-sm">
+            No wallets yet
           </div>
         )}
       </div>
 
       {/* Wallet Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-base">
               {editingWallet ? "Edit Wallet" : "New Wallet"}
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Icon</Label>
-              <div className="flex flex-wrap gap-2">
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Icon</Label>
+              <div className="flex flex-wrap gap-1.5">
                 {WALLET_ICONS.map((icon) => (
                   <button
                     key={icon}
                     type="button"
                     onClick={() => setFormData({ ...formData, icon })}
                     className={cn(
-                      "w-10 h-10 rounded-lg text-xl flex items-center justify-center transition-all",
+                      "w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all",
                       formData.icon === icon
-                        ? "bg-primary text-primary-foreground scale-110"
+                        ? "bg-primary text-primary-foreground scale-105"
                         : "bg-muted hover:bg-muted/80"
                     )}
                   >
@@ -207,29 +208,31 @@ export default function WalletManager() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Name</Label>
+            <div className="space-y-1">
+              <Label className="text-xs">Name</Label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="My Wallet"
+                className="h-9"
                 required
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Initial Balance</Label>
+            <div className="space-y-1">
+              <Label className="text-xs">Initial Balance</Label>
               <Input
                 type="number"
                 step="0.01"
                 value={formData.balance}
                 onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
                 placeholder="0.00"
+                className="h-9"
               />
             </div>
 
             <div className="flex items-center justify-between">
-              <Label>Enabled</Label>
+              <Label className="text-xs">Enabled</Label>
               <Switch
                 checked={formData.is_enabled}
                 onCheckedChange={(checked) =>
@@ -239,13 +242,13 @@ export default function WalletManager() {
             </div>
 
             <DialogFooter>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" size="sm" disabled={isSubmitting}>
                 {isSubmitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : editingWallet ? (
-                  "Save Changes"
+                  "Save"
                 ) : (
-                  "Create Wallet"
+                  "Create"
                 )}
               </Button>
             </DialogFooter>
@@ -259,7 +262,7 @@ export default function WalletManager() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Wallet?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will delete the wallet and all associated transactions. This action cannot be undone.
+              This will delete the wallet and all associated transactions.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
