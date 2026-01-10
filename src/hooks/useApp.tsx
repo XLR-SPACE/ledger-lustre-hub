@@ -7,6 +7,7 @@ import {
   User,
   InitStatus,
 } from "@/lib/api";
+import { getDefaultWalletId } from "./useCache";
 
 interface AppContextType {
   initStatus: InitStatus | null;
@@ -48,7 +49,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (response.success) {
         setWallets(response.data || []);
         if (!selectedWallet && response.data?.length > 0) {
-          setSelectedWallet(response.data[0]);
+          // Try to use default wallet first
+          const defaultWalletId = getDefaultWalletId();
+          const defaultWallet = defaultWalletId
+            ? response.data.find((w) => w.wallet_id === defaultWalletId)
+            : null;
+          setSelectedWallet(defaultWallet || response.data[0]);
         }
       }
     } catch (error) {
