@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { getCategoryTree, CategoryTreeNode, Category } from "@/lib/api";
 import { useApp } from "@/hooks/useApp";
+import { getCachedCategories, setCachedCategories } from "@/hooks/useCache";
 import { cn } from "@/lib/utils";
 import { ChevronRight, Loader2, Search } from "lucide-react";
 import {
@@ -25,6 +26,7 @@ function CategoryNode({
   onSelect,
   searchQuery,
   forceExpanded,
+  parentMatches,
 }: {
   node: CategoryTreeNode;
   level: number;
@@ -32,42 +34,54 @@ function CategoryNode({
   onSelect: (category: Category) => void;
   searchQuery: string;
   forceExpanded?: boolean;
+  parentMatches?: boolean;
 }) {
   const [expanded, setExpanded] = useState(true);
   const hasChildren = node.children && node.children.length > 0;
   const isSelected = node.category.category_id === selectedId;
 
-  // Check if this node or any descendant matches the search
-  const matchesSearch = (n: CategoryTreeNode): boolean => {
-    const nameMatches = n.category.name.toLowerCase().includes(searchQuery.toLowerCase());
-    if (nameMatches) return true;
+  // Check if this node matches the search
+  const thisNodeMatches = node.category.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+  // Check if any descendant matches the search
+  const descendantMatches = (n: CategoryTreeNode): boolean => {
     if (n.children) {
-      return n.children.some(matchesSearch);
+      return n.children.some(child => 
+        child.category.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        descendantMatches(child)
+      );
     }
     return false;
   };
 
-  // Check if THIS node directly matches (for parent that should show children)
-  const thisNodeMatches = node.category.name.toLowerCase().includes(searchQuery.toLowerCase());
+  // This node should show if:
+  // 1. No search query
+  // 2. This node matches
+  // 3. Any descendant matches
+  // 4. Parent matched (show all children of matching parents)
+  const shouldShow = !searchQuery || thisNodeMatches || descendantMatches(node) || parentMatches;
 
-  // If searching and no match at all, hide this node
-  if (searchQuery && !matchesSearch(node)) {
+  if (!shouldShow) {
     return null;
   }
 
-  // If searching and this parent node matches, show all its children
-  const shouldShowAllChildren = searchQuery && thisNodeMatches && hasChildren;
+  // Show children if:
+  // 1. Manually expanded
+  // 2. Force expanded from parent
+  // 3. This node matches search (show all its children)
+  // 4. Any descendant matches (to show path to match)
+  const shouldShowChildren = expanded || forceExpanded || (searchQuery && (thisNodeMatches || descendantMatches(node)));
 
   return (
     <div>
       <div
         className={cn(
-          "flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all",
+          "flex items-center gap-1.5 py-1.5 px-2 rounded-md cursor-pointer transition-all",
           isSelected
             ? "bg-primary/10 border border-primary"
             : "hover:bg-muted active:bg-muted/80"
         )}
-        style={{ marginLeft: `${level * 16}px` }}
+        style={{ marginLeft: `${level * 12}px` }}
       >
         {hasChildren && (
           <button
@@ -80,24 +94,24 @@ function CategoryNode({
           >
             <ChevronRight
               className={cn(
-                "h-3.5 w-3.5 text-muted-foreground transition-transform",
-                (expanded || forceExpanded || shouldShowAllChildren) && "rotate-90"
+                "h-3 w-3 text-muted-foreground transition-transform",
+                shouldShowChildren && "rotate-90"
               )}
             />
           </button>
         )}
         <div
-          className="flex items-center gap-2 flex-1"
+          className="flex items-center gap-1.5 flex-1"
           onClick={() => onSelect(node.category)}
         >
-          <span className="text-lg">{node.category.icon}</span>
-          <span className={cn("flex-1 text-sm font-medium", isSelected && "text-primary")}>
+          <span className="text-sm">{node.category.icon}</span>
+          <span className={cn("flex-1 text-xs font-medium", isSelected && "text-primary")}>
             {node.category.name}
           </span>
         </div>
       </div>
       
-      {hasChildren && (expanded || forceExpanded || shouldShowAllChildren) && (
+      {hasChildren && shouldShowChildren && (
         <div className="space-y-0.5">
           {node.children!.map((child) => (
             <CategoryNode
@@ -107,7 +121,8 @@ function CategoryNode({
               selectedId={selectedId}
               onSelect={onSelect}
               searchQuery={searchQuery}
-              forceExpanded={shouldShowAllChildren}
+              forceExpanded={forceExpanded}
+              parentMatches={thisNodeMatches && !!searchQuery}
             />
           ))}
         </div>
@@ -131,11 +146,19 @@ export default function CategoryPicker({
     const fetchTree = async () => {
       if (!selectedWallet || !open) return;
       
-      setIsLoading(true);
+      // Try cache first
+      const cached = getCachedCategories<CategoryTreeNode[]>(selectedWallet.wallet_id);
+      if (cached) {
+        setTree(cached);
+      }
+      
+      setIsLoading(!cached);
       try {
         const response = await getCategoryTree(selectedWallet.wallet_id);
         if (response.success) {
-          setTree(response.data?.roots || []);
+          const roots = response.data?.roots || [];
+          setTree(roots);
+          setCachedCategories(selectedWallet.wallet_id, roots);
         }
       } catch (error) {
         console.error("Failed to fetch category tree:", error);
@@ -156,29 +179,29 @@ export default function CategoryPicker({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm max-h-[70vh] overflow-hidden flex flex-col top-[5%] translate-y-0">
-        <DialogHeader className="pb-2">
-          <DialogTitle className="text-base">Select Category</DialogTitle>
+      <DialogContent className="max-w-xs max-h-[65vh] overflow-hidden flex flex-col top-[3%] translate-y-0 p-3">
+        <DialogHeader className="pb-1">
+          <DialogTitle className="text-sm">Select Category</DialogTitle>
         </DialogHeader>
         
         {/* Search Bar */}
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
           <Input
             placeholder="Search categories..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8 h-8 text-sm"
+            className="pl-7 h-7 text-xs"
           />
         </div>
         
         <div className="flex-1 overflow-y-auto scrollbar-hide py-1">
           {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             </div>
           ) : tree.length === 0 ? (
-            <p className="text-center text-muted-foreground py-6 text-sm">
+            <p className="text-center text-muted-foreground py-4 text-xs">
               No categories found
             </p>
           ) : (

@@ -146,7 +146,7 @@ export default function WalletManager() {
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate">{wallet.name}</p>
               <p className="text-sm font-semibold text-primary">
-                ${wallet.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {wallet.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
               </p>
             </div>
             <div className="flex gap-1">

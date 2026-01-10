@@ -1,7 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Transaction, Category, createTransaction, updateTransaction, deleteTransaction } from "@/lib/api";
 import { useApp } from "@/hooks/useApp";
-import { getLastTransactionTime, setLastTransactionTime } from "@/hooks/useCache";
+import { getLastTransactionTime, setLastTransactionTime, invalidateCategoryCache } from "@/hooks/useCache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import CategoryPicker from "./CategoryPicker";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Trash2, Tag, Calendar, DollarSign, FileText, User } from "lucide-react";
+import { Loader2, Trash2, Tag, Calendar, FileText, User } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +57,26 @@ export default function TransactionDialog({
   });
 
   const isEditing = !!transaction;
+
+  // Handle back button to close dialog instead of exiting app
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePopState = (e: PopStateEvent) => {
+      e.preventDefault();
+      onClose();
+      // Push state back so we don't actually navigate
+      window.history.pushState(null, "", window.location.href);
+    };
+
+    // Push a state when dialog opens
+    window.history.pushState(null, "", window.location.href);
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [open, onClose]);
 
   useEffect(() => {
     if (transaction) {
@@ -133,6 +153,9 @@ export default function TransactionDialog({
         toast({ title: "Transaction added" });
       }
 
+      // Refresh category cache in background
+      invalidateCategoryCache(selectedWallet.wallet_id);
+
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -147,12 +170,16 @@ export default function TransactionDialog({
   };
 
   const handleDelete = async () => {
-    if (!transaction) return;
+    if (!transaction || !selectedWallet) return;
 
     setIsSubmitting(true);
     try {
       await deleteTransaction(transaction.transaction_id);
       toast({ title: "Transaction deleted" });
+      
+      // Refresh category cache in background
+      invalidateCategoryCache(selectedWallet.wallet_id);
+      
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -170,18 +197,17 @@ export default function TransactionDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-        <DialogContent className="max-w-sm max-h-[85vh] overflow-y-auto top-[8%] translate-y-0">
-          <DialogHeader className="pb-2">
-            <DialogTitle className="text-base">
+        <DialogContent className="max-w-sm max-h-[80vh] overflow-y-auto top-[5%] translate-y-0 p-4">
+          <DialogHeader className="pb-1">
+            <DialogTitle className="text-sm">
               {isEditing ? "Edit Transaction" : "Add Transaction"}
             </DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleSubmit} className="space-y-2">
             {/* Amount */}
-            <div className="space-y-1">
-              <Label className="flex items-center gap-1.5 text-xs">
-                <DollarSign className="h-3 w-3 text-muted-foreground" />
+            <div className="space-y-0.5">
+              <Label className="flex items-center gap-1 text-[10px] text-muted-foreground">
                 Amount
               </Label>
               <Input
@@ -191,22 +217,22 @@ export default function TransactionDialog({
                 placeholder="0.00"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                className="text-xl font-bold h-12"
+                className="text-lg font-bold h-10"
                 required
               />
             </div>
 
             {/* Category */}
-            <div className="space-y-1">
-              <Label className="flex items-center gap-1.5 text-xs">
-                <Tag className="h-3 w-3 text-muted-foreground" />
+            <div className="space-y-0.5">
+              <Label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <Tag className="h-2.5 w-2.5" />
                 Category
               </Label>
               <button
                 type="button"
                 onClick={() => setShowCategoryPicker(true)}
                 className={cn(
-                  "w-full flex items-center gap-2 p-2.5 rounded-lg border transition-colors text-left text-sm",
+                  "w-full flex items-center gap-2 p-2 rounded-md border transition-colors text-left text-xs",
                   formData.category
                     ? "border-primary bg-primary/5"
                     : "border-input hover:bg-muted"
@@ -214,7 +240,7 @@ export default function TransactionDialog({
               >
                 {formData.category ? (
                   <>
-                    <span className="text-lg">{formData.category.icon}</span>
+                    <span className="text-base">{formData.category.icon}</span>
                     <span className="font-medium">{formData.category.name}</span>
                   </>
                 ) : (
@@ -224,9 +250,9 @@ export default function TransactionDialog({
             </div>
 
             {/* Date/Time */}
-            <div className="space-y-1">
-              <Label className="flex items-center gap-1.5 text-xs">
-                <Calendar className="h-3 w-3 text-muted-foreground" />
+            <div className="space-y-0.5">
+              <Label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <Calendar className="h-2.5 w-2.5" />
                 Date & Time
               </Label>
               <Input
@@ -235,14 +261,28 @@ export default function TransactionDialog({
                 onChange={(e) =>
                   setFormData({ ...formData, transaction_time: e.target.value })
                 }
-                className="h-9 text-sm"
+                className="h-8 text-xs"
+              />
+            </div>
+
+            {/* Note - Moved above Person */}
+            <div className="space-y-0.5">
+              <Label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <FileText className="h-2.5 w-2.5" />
+                Note
+              </Label>
+              <Input
+                placeholder="Add a note..."
+                value={formData.note}
+                onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                className="h-8 text-xs"
               />
             </div>
 
             {/* Person */}
-            <div className="space-y-1">
-              <Label className="flex items-center gap-1.5 text-xs">
-                <User className="h-3 w-3 text-muted-foreground" />
+            <div className="space-y-0.5">
+              <Label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <User className="h-2.5 w-2.5" />
                 Person/Payee
               </Label>
               <Input
@@ -251,21 +291,7 @@ export default function TransactionDialog({
                 onChange={(e) =>
                   setFormData({ ...formData, person_name: e.target.value })
                 }
-                className="h-9 text-sm"
-              />
-            </div>
-
-            {/* Note */}
-            <div className="space-y-1">
-              <Label className="flex items-center gap-1.5 text-xs">
-                <FileText className="h-3 w-3 text-muted-foreground" />
-                Note
-              </Label>
-              <Input
-                placeholder="Add a note..."
-                value={formData.note}
-                onChange={(e) => setFormData({ ...formData, note: e.target.value })}
-                className="h-9 text-sm"
+                className="h-8 text-xs"
               />
             </div>
 
@@ -275,6 +301,7 @@ export default function TransactionDialog({
                   type="button"
                   variant="destructive"
                   size="sm"
+                  className="h-9 px-3"
                   onClick={() => setShowDeleteConfirm(true)}
                   disabled={isSubmitting}
                 >
@@ -284,7 +311,7 @@ export default function TransactionDialog({
               <Button
                 type="submit"
                 size="sm"
-                className="flex-1"
+                className="flex-1 h-9"
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (

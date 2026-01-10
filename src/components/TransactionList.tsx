@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Transaction, getWalletTransactions, CategoryTreeNode, getCategoryTree } from "@/lib/api";
 import { useApp } from "@/hooks/useApp";
+import { getPersistedPeriod, setPersistedPeriod, PeriodType } from "@/hooks/useCache";
 import TransactionItem from "./TransactionItem";
-import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, endOfDay, endOfWeek, endOfMonth, endOfYear, addDays, addWeeks, addMonths, addYears } from "date-fns";
+import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, endOfDay, endOfWeek, endOfMonth, endOfYear, addDays, addWeeks, addMonths, addYears, isToday, isYesterday } from "date-fns";
 import { ChevronLeft, ChevronRight, Calendar, ArrowUpDown, Loader2, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 
-type PeriodType = "all" | "daily" | "weekly" | "monthly" | "yearly" | "custom";
 type SortType = "transaction_time" | "entry_time" | "last_modified_time" | "category";
 
 interface TransactionListProps {
@@ -52,20 +52,50 @@ function setCachedTransactions(walletId: number, periodKey: string, data: Transa
   }
 }
 
+// Helper to get friendly date label
+function getDateLabel(date: Date, periodType: PeriodType): string {
+  if (periodType === "daily") {
+    if (isToday(date)) {
+      return `Today - ${format(date, "MMM d, yyyy")}`;
+    }
+    if (isYesterday(date)) {
+      return `Yesterday - ${format(date, "MMM d, yyyy")}`;
+    }
+  }
+  return format(date, "EEEE, MMM d, yyyy");
+}
+
 export default function TransactionList({ onTransactionClick, refreshTrigger }: TransactionListProps) {
   const { selectedWallet } = useApp();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categoryTree, setCategoryTree] = useState<CategoryTreeNode[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [periodType, setPeriodType] = useState<PeriodType>("monthly");
+  const [isBackgroundLoading, setIsBackgroundLoading] = useState(false);
+  
+  // Load persisted period settings
+  const persistedPeriod = getPersistedPeriod();
+  const [periodType, setPeriodType] = useState<PeriodType>(persistedPeriod.periodType);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [sortBy, setSortBy] = useState<SortType>("transaction_time");
-  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(
+    persistedPeriod.customStartDate ? new Date(persistedPeriod.customStartDate) : undefined
+  );
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(
+    persistedPeriod.customEndDate ? new Date(persistedPeriod.customEndDate) : undefined
+  );
   const [periodDropdownOpen, setPeriodDropdownOpen] = useState(false);
   const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Persist period selection changes
+  useEffect(() => {
+    setPersistedPeriod({
+      periodType,
+      customStartDate: customStartDate?.toISOString(),
+      customEndDate: customEndDate?.toISOString(),
+    });
+  }, [periodType, customStartDate, customEndDate]);
 
   const { periodStart, periodEnd, periodLabel, periodKey } = useMemo(() => {
     if (periodType === "all") {
@@ -92,7 +122,7 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
       case "daily":
         start = startOfDay(currentDate);
         end = endOfDay(currentDate);
-        label = format(currentDate, "EEEE, MMM d, yyyy");
+        label = getDateLabel(currentDate, periodType);
         break;
       case "weekly":
         start = startOfWeek(currentDate, { weekStartsOn: 1 });
@@ -140,6 +170,10 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
 
   const handlePeriodTypeChange = (type: PeriodType) => {
     setPeriodType(type);
+    // Reset to current date when switching to daily/weekly/monthly/yearly
+    if (type !== "custom" && type !== "all") {
+      setCurrentDate(new Date());
+    }
     if (type !== "custom") {
       setCustomStartDate(undefined);
       setCustomEndDate(undefined);
@@ -163,7 +197,7 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
     fetchCategories();
   }, [selectedWallet]);
 
-  const fetchTransactions = useCallback(async (forceRefresh = false) => {
+  const fetchTransactions = useCallback(async (forceRefresh = false, isBackground = false) => {
     if (!selectedWallet) return;
     
     // Check cache first (unless force refresh)
@@ -171,11 +205,34 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
       const cached = getCachedTransactions(selectedWallet.wallet_id, periodKey);
       if (cached) {
         setTransactions(cached);
+        // Still fetch in background to update
+        setIsBackgroundLoading(true);
+        try {
+          const filters = periodType === "all" ? {} : {
+            start_transaction_time: periodStart!.toISOString(),
+            end_transaction_time: periodEnd!.toISOString(),
+          };
+          const response = await getWalletTransactions(selectedWallet.wallet_id, filters);
+          if (response.success) {
+            const data = response.data || [];
+            setTransactions(data);
+            setCachedTransactions(selectedWallet.wallet_id, periodKey, data);
+          }
+        } catch (error) {
+          console.error("Background fetch failed:", error);
+        } finally {
+          setIsBackgroundLoading(false);
+        }
         return;
       }
     }
 
-    setIsLoading(true);
+    if (isBackground) {
+      setIsBackgroundLoading(true);
+    } else {
+      setIsLoading(true);
+    }
+    
     try {
       const filters = periodType === "all" ? {} : {
         start_transaction_time: periodStart!.toISOString(),
@@ -193,6 +250,7 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
       console.error("Failed to fetch transactions:", error);
     } finally {
       setIsLoading(false);
+      setIsBackgroundLoading(false);
     }
   }, [selectedWallet, periodStart, periodEnd, periodType, periodKey]);
 
@@ -210,7 +268,7 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
   // Periodic sync
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchTransactions(true);
+      fetchTransactions(true, true);
     }, 60000); // Sync every minute
     return () => clearInterval(interval);
   }, [fetchTransactions]);
@@ -376,6 +434,9 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
                 <Button variant="ghost" className="h-auto py-1 px-2 gap-1">
                   <Calendar className="h-3 w-3 text-muted-foreground" />
                   <span className="font-medium text-sm">{periodLabel}</span>
+                  {isBackgroundLoading && (
+                    <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-1" />
+                  )}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-36 p-1" align="center">
@@ -445,10 +506,10 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
 
           <div className="flex gap-2 text-xs">
             <span className="text-income font-medium">
-              +${totalIncome.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              +{totalIncome.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
             <span className="text-expense font-medium">
-              -${totalExpense.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              -{totalExpense.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
           </div>
           
@@ -505,7 +566,7 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
                     {catName}
                   </p>
                   <p className="text-xs font-medium text-primary">
-                    ${total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div className="space-y-1.5">
