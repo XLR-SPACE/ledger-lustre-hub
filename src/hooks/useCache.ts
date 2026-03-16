@@ -50,7 +50,7 @@ export function useCache<T>(
   const cacheKey = getCacheKey(key, walletId);
   const [data, setData] = useState<T | null>(() => getFromCache<T>(cacheKey));
   const [isLoading, setIsLoading] = useState(!data);
-  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refresh = useCallback(async () => {
     try {
