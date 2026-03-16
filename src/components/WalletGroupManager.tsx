@@ -320,5 +320,5 @@ export default function WalletGroupManager() {
   );
 }
 
-// Export for use in WalletSelector
-export { getWalletGroups, type WalletGroup };
+// Export helper functions for use in WalletSelector
+export { getWalletGroups };
