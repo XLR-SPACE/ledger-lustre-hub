@@ -8,7 +8,7 @@ interface UseLongPressOptions {
 
 export function useLongPress({ onLongPress, onClick, delay = 500 }: UseLongPressOptions) {
   const [isLongPressing, setIsLongPressing] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isLongPressRef = useRef(false);
 
   const start = useCallback((e: React.TouchEvent | React.MouseEvent) => {
