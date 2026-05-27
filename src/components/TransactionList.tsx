@@ -387,53 +387,57 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
             <ChevronLeft className="h-4 w-4" />
           </Button>
           
-          {periodType === "custom" ? (
-            <div className="flex items-center gap-1">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-7 text-xs px-2">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    {customStartDate ? format(customStartDate, "MMM d") : "Start"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <CalendarComponent
-                    mode="single"
-                    selected={customStartDate}
-                    onSelect={setCustomStartDate}
-                    initialFocus
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-              
-              <span className="text-xs text-muted-foreground">to</span>
-              
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-7 text-xs px-2">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    {customEndDate ? format(customEndDate, "MMM d") : "End"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                  <CalendarComponent
-                    mode="single"
-                    selected={customEndDate}
-                    onSelect={setCustomEndDate}
-                    initialFocus
-                    className="pointer-events-auto"
-                    disabled={(date) => customStartDate ? date < customStartDate : false}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          ) : (
+          <div className="flex items-center gap-1">
+            {periodType === "custom" && (
+              <>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-xs px-2">
+                      <Calendar className="h-3 w-3 mr-1" />
+                      {customStartDate ? format(customStartDate, "MMM d") : "Start"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={customStartDate}
+                      onSelect={setCustomStartDate}
+                      initialFocus
+                      className="pointer-events-auto"
+                    />
+                  </PopoverContent>
+                </Popover>
+                
+                <span className="text-xs text-muted-foreground">to</span>
+                
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 text-xs px-2">
+                      <Calendar className="h-3 w-3 mr-1" />
+                      {customEndDate ? format(customEndDate, "MMM d") : "End"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <CalendarComponent
+                      mode="single"
+                      selected={customEndDate}
+                      onSelect={setCustomEndDate}
+                      initialFocus
+                      className="pointer-events-auto"
+                      disabled={(date) => customStartDate ? date < customStartDate : false}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </>
+            )}
+            
             <Popover open={periodDropdownOpen} onOpenChange={setPeriodDropdownOpen}>
               <PopoverTrigger asChild>
                 <Button variant="ghost" className="h-auto py-1 px-2 gap-1">
                   <Calendar className="h-3 w-3 text-muted-foreground" />
-                  <span className="font-medium text-sm">{periodLabel}</span>
+                  {periodType !== "custom" && (
+                    <span className="font-medium text-sm">{periodLabel}</span>
+                  )}
                   {isBackgroundLoading && (
                     <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-1" />
                   )}
@@ -456,7 +460,7 @@ export default function TransactionList({ onTransactionClick, refreshTrigger }: 
                 ))}
               </PopoverContent>
             </Popover>
-          )}
+          </div>
           
           <Button
             variant="ghost"
